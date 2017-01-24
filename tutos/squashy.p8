@@ -17,7 +17,7 @@ ball = {
 	ydir = -3,
 }
 
-score = 0
+score = 1
 lives = 3
 
 function movepaddle()
