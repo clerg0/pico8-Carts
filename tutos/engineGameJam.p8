@@ -35,10 +35,11 @@ anim_djump   = {21}
 anim_falling = {17,18}
 
 -- physics variables
-gravity = 1
+gravity = 0.3
 max_body_speed = 4
-jump_speed = -6
-walk_speed = 1.5
+jump_speed = - 11 * gravity
+walk_speed = 2.5
+friction = 1
 colision_margin = 1
 
 -- type
@@ -135,9 +136,9 @@ end
 function _update()
 	global_time += 1
 	
-	update_controller()
 	update_physics()
 	update_player()
+	update_controller()
 end
 
 function update_physics()
@@ -145,56 +146,87 @@ function update_physics()
 		body.speed_y += gravity
 		body.speed_y = min(body.speed_y, max_body_speed)
 		
-		-- update colision on y axis
-		if(is_solid_horizontal_check(body.position_x, body.position_y + 8*body.size_y, 8 * body.size_x) and body.speed_y >= 0) then
-			body.speed_y = 0
-			body.position_y = (flr(body.position_y / 8) - body.size_y + 1) * 8
-		elseif(is_solid_horizontal_check(body.position_x, body.position_y - 9, 8 * body.size_x) and body.speed_y <= jump_speed + gravity) then
-			body.speed_y = max(body.speed_y, jump_speed + gravity)
-			body.position_y = (flr(body.position_y / 8)) * 8
-		elseif(is_solid_horizontal_check(body.position_x, body.position_y - 1, 8 * body.size_x) and body.speed_y < 0) then
-			body.speed_y = 0
-			body.position_y = (flr(body.position_y / 8)) * 8
-		else
-			body.position_y += body.speed_y			
+		--right
+		if (body.speed_x > 0) then
+			local actual_speed = 0
+			while (not is_solid(body.position_x + 7 + actual_speed + 1 - 1, body.position_y + 2) and
+				   not is_solid(body.position_x + 7 + actual_speed + 1 - 1, body.position_y + 7) and actual_speed < body.speed_x) do
+				actual_speed += 0.1
+			end
+			
+			--if ( abs(body.speed_x - actual_speed) > 0.2 ) then
+			--	body.speed_y = 0
+			--end
+			body.speed_x = actual_speed
+			
 		end
 
+		--left
+		if (body.speed_x < 0) then
+			local actual_speed = 0
+			while (not is_solid(body.position_x + actual_speed - 1 + 1, body.position_y + 2) and
+				   not is_solid(body.position_x + actual_speed - 1 + 1, body.position_y + 7) and actual_speed > body.speed_x) do
+				actual_speed -= 0.1
+			end
 
-		-- update colision on x axis
-		if(is_solid_vertical_check(body.position_x - 1, body.position_y, 8 * body.size_y) and body.speed_x < 0) then
-			body.speed_x = 0
-		elseif(is_solid_vertical_check(body.position_x + 8, body.position_y, 8 * body.size_y) and body.speed_x > 0) then
-			body.speed_x = 0
-		else
-			body.position_x += body.speed_x	
-		end
-	end
-end
+			--if ( abs(body.speed_x - actual_speed) > 0.2  ) then
+			--	body.speed_y = 0
+			--end
+			body.speed_x = actual_speed
 
-function is_solid_horizontal_check(x,y,length)
-	for i = colision_margin, length - colision_margin - 1 do
-		local sprite_id = mget(flr((x + i) / 8), flr(y / 8))
-		if(fget(sprite_id, flag_solid)) then
-			return true
 		end
+
+		body.position_x += body.speed_x
+		if (body.speed_x > 0) then
+			body.speed_x -= friction
+			body.speed_x = max(0,body.speed_x)
+		elseif (body.speed_x < 0) then
+			body.speed_x += friction
+			body.speed_x = min(0, body.speed_x)
+		end
+
+		-- top
+		if (body.speed_y < 0) then
+			local actual_speed = 0
+			while (not is_solid(body.position_x + 2, body.position_y + actual_speed - 1 + 1) and
+				   not is_solid(body.position_x + 7 - 2, body.position_y + actual_speed - 1 + 1) and actual_speed > body.speed_y) do
+				actual_speed -= 0.1
+			end
+			body.speed_y = actual_speed
+		end
+
+		-- down
+		if (body.speed_y > 0) then
+			local actual_speed = 0
+			while (not is_solid(body.position_x + 2, body.position_y + 7 + actual_speed + 1 ) and
+				   not is_solid(body.position_x + 7 - 2, body.position_y + 7 + actual_speed + 1) and actual_speed < body.speed_y) do
+				actual_speed += 0.1
+			end
+			body.speed_y = actual_speed
+		end		
+		
+
+
+		--if (is_grounded(body) and body.speed_y > 0) then
+		--	body.speed_y = 0
+		--end
+		body.position_y += body.speed_y
+
 	end
 end
 
 function is_grounded(body)
-	return is_solid_horizontal_check(body.position_x, body.position_y + 8*body.size_y, 8 * body.size_x)
-end
-
-function is_roofed(body)
-	return is_solid_horizontal_check(body.position_x, body.position_y - 1, 8 * body.size_x)
-end
-
-function is_solid_vertical_check(x,y,length)
-	for i = colision_margin, length - colision_margin - 1 do
-		local sprite_id = mget(flr(x / 8), flr((y + i) / 8))
-		if(fget(sprite_id, flag_solid)) then
-			return true
-		end
+	for i = 2, 6 do
+		local sprite_id = mget(flr((body.position_x+i)/8),flr((body.position_y+8)/8))
+		if (fget(sprite_id, flag_solid)) return true
 	end
+	return false
+end
+
+function is_solid(x,y)
+	local sprite_id = mget(flr(x/8),flr(y/8))
+	if (fget(sprite_id, flag_solid)) return true
+	return false
 end
 
 function update_player()
@@ -204,7 +236,7 @@ function update_player()
 
 		-- idle state
 		if(character.state == state_idle) then
-			character.speed_x = 0
+			--character.speed_x = 0
 			character.previous_state = state_idle
 			character.djump_available = true
 
@@ -214,7 +246,7 @@ function update_player()
 			elseif(not is_grounded(character)) then
 				character.state = state_falling
 				character.state_time = 0
-			elseif(btn(button_jump)) then
+			elseif(btn_down(button_jump)) then
 				character.state = state_jump
 				character.state_time = 0
 			end
@@ -230,7 +262,7 @@ function update_player()
 				character.speed_x = walk_speed
 			end
 
-			if(btn(button_jump)) then
+			if(btn_down(button_jump)) then
 				character.state = state_jump
 				character.state_time = 0
 			elseif(not is_grounded(character)) then
@@ -252,21 +284,21 @@ function update_player()
 				character.speed_x = -walk_speed
 			elseif(btn(button_right)) then
 				character.speed_x = walk_speed
-			else
-				character.speed_x = 0
+			--else
+			--	character.speed_x = 0
 			end
 
-			--if(is_grounded(character)) then
-			--	if(btn(button_left) or btn(button_right)) then
-			--		character.state = state_walk
-			--	else
-			--		character.state = state_idle
-			--	end
-			--	character.state_time = 0
-			--else
-			if(is_roofed(character)) then
-				character.state = state_falling
+			if(is_grounded(character)) then
+				if(btn(button_left) or btn(button_right)) then
+					character.state = state_walk
+				else
+					character.state = state_idle
+				end
 				character.state_time = 0
+			--else
+			--if(is_roofed(character)) then
+			--	character.state = state_falling
+			--	character.state_time = 0
 			elseif(btn_down(button_jump) and character.djump_available) then
 				character.state = state_djump
 				character.state_time = 0
@@ -278,11 +310,11 @@ function update_player()
 		-- double jump state
 		elseif(character.state == state_djump) then
 			if(character.previous_state != state_djump) then
-				if(character.speed_y > 0) then
+				--if(character.speed_y > 0) then
 					character.speed_y = jump_speed
-				else
-					character.speed_y += jump_speed
-				end
+				--else
+				--	character.speed_y += jump_speed
+				--end
 			end
 			character.previous_state = state_djump
 			character.djump_available = false
@@ -291,23 +323,23 @@ function update_player()
 				character.speed_x = -walk_speed
 			elseif(btn(button_right)) then
 				character.speed_x = walk_speed
-			else
-				character.speed_x = 0
+			--else
+			--	character.speed_x = 0
 			end
 
-			if(is_roofed(character)) then
-				character.state = state_falling
-				character.state_time = 0
-			elseif(character.speed_y > 0) then
-				character.state = state_falling
-				character.state_time = 0
-			--elseif(is_grounded(character)) then
-			--	if(btn(button_left) or btn(button_right)) then
-			--		character.state = state_walk
-			--	else
-			--		character.state = state_idle
-			--	end
+			--if(is_roofed(character)) then
+			--	character.state = state_falling
 			--	character.state_time = 0
+			if(character.speed_y > 0) then
+				character.state = state_falling
+				character.state_time = 0
+			elseif(is_grounded(character)) then
+				if(btn(button_left) or btn(button_right)) then
+					character.state = state_walk
+				else
+					character.state = state_idle
+				end
+				character.state_time = 0
 			end
 
 		-- falling state
@@ -318,12 +350,12 @@ function update_player()
 				character.speed_x = -walk_speed
 			elseif(btn(button_right)) then
 				character.speed_x = walk_speed
-			else
-				character.speed_x = 0
+			--else
+			--	character.speed_x = 0
 			end
 
 			if(is_grounded(character)) then
-				if(btn(button_jump)) then
+				if(btn_down(button_jump)) then
 					character.state = state_jump
 				elseif(btn(button_left) or btn(button_right)) then
 					character.state = state_walk
@@ -348,9 +380,11 @@ function _draw()
 	camera(camposx, camposy)
 	draw_unit(player)
 
-	print(fget(mget(flr((player.position_x + (8 * player.size_x - 1) / 2) / 8), flr((player.position_y + 8) / 8))), player.position_x, player.position_y + 8)
-	print(fget(mget(flr((player.position_x + (8 * player.size_x - 1) / 2) / 8), flr((player.position_y - 1) / 8))), player.position_x, player.position_y - 8)
-	print(fget(mget(flr((player.position_x + (8 * player.size_x - 1) / 2) / 8), flr((player.position_y - 9) / 8))), player.position_x, player.position_y - 16)
+	--print(player.djump_available, player.position_x, player.position_y - 8)
+	print(btn_down(button_jump), player.position_x, player.position_y - 8)
+	--print(fget(mget(flr((player.position_x + (8 * player.size_x - 1) / 2) / 8), flr((player.position_y + 8) / 8))), player.position_x, player.position_y + 8)
+	--print(fget(mget(flr((player.position_x + (8 * player.size_x - 1) / 2) / 8), flr((player.position_y - 1) / 8))), player.position_x, player.position_y - 8)
+	--print(fget(mget(flr((player.position_x + (8 * player.size_x - 1) / 2) / 8), flr((player.position_y - 9) / 8))), player.position_x, player.position_y - 16)
 	--print(is_solid_2top(player), player.position_x, player.position_y - 8)
 end
 
@@ -364,13 +398,13 @@ end
 -- ************************************************************************ utils functions ************************************************************************
 button_previous = {}
 function update_controller()
-	for i = 0 , 5 do
-		button_previous[i] = btn(i)
+	for i = 1, 7 do
+		button_previous[i] = btn(i-1)
 	end
 end
 
 function btn_down(button)
-	return not button_previous[button] and btn(button)
+	return not button_previous[button+1] and btn(button)
 end
 
 __gfx__
